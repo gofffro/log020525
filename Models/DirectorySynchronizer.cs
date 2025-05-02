@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace log020525.Models
@@ -7,48 +8,97 @@ namespace log020525.Models
   {
     public List<string> SyncDirectories(string sourcePath, string targetPath)
     {
-      var syncLog = new List<string>();
+      var synchronizationLog = new List<string>();
+      var logEntries = new List<SyncLogEntry>();
 
-      SyncOneWay(sourcePath, targetPath, syncLog);
-      SyncOneWay(targetPath, sourcePath, syncLog);
+      var previousLogEntries = XmlLogger.LoadLog();
 
-      return syncLog;
+      SyncOneWay(sourcePath, targetPath, synchronizationLog, logEntries, previousLogEntries);
+      SyncOneWay(targetPath, sourcePath, synchronizationLog, logEntries, previousLogEntries);
+
+      XmlLogger.SaveLog(logEntries);
+      JsonLogger.SaveLog(logEntries);
+
+      return synchronizationLog;
     }
 
-    private void SyncOneWay(string sourceDir, string targetDir, List<string> syncLog)
+    private void SyncOneWay(string sourceDirectory, string targetDirectory, List<string> synchronizationLog, List<SyncLogEntry> logEntries, List<SyncLogEntry> previousLogEntries)
     {
-      var sourceFiles = Directory.GetFiles(sourceDir);
-      var targetFiles = Directory.GetFiles(targetDir);
+      var sourceFilePaths = Directory.GetFiles(sourceDirectory);
+      var targetFilePaths = Directory.GetFiles(targetDirectory);
 
-      var targetFileNames = new HashSet<string>();
-      foreach (var targetFilePath in targetFiles)
+      var targetFileNamesSet = new HashSet<string>();
+
+      foreach (string targetFilePath in targetFilePaths)
       {
-        var targetFileName = Path.GetFileName(targetFilePath);
-        targetFileNames.Add(targetFileName);
+        string targetFileName = Path.GetFileName(targetFilePath);
+        targetFileNamesSet.Add(targetFileName);
       }
 
-      foreach (var sourceFilePath in sourceFiles)
+      foreach (string sourceFilePath in sourceFilePaths)
       {
-        var sourceFileName = Path.GetFileName(sourceFilePath);
-        var targetFilePath = Path.Combine(targetDir, sourceFileName);
+        string sourceFileName = Path.GetFileName(sourceFilePath);
+        string correspondingTargetPath = Path.Combine(targetDirectory, sourceFileName);
+        DateTime sourceLastModified = File.GetLastWriteTime(sourceFilePath);
 
-        if (!File.Exists(targetFilePath))
+        if (!ShouldSynchronize(sourceFileName, sourceLastModified, previousLogEntries))
         {
-          File.Copy(sourceFilePath, targetFilePath);
-          syncLog.Add($"Файл \"{sourceFileName}\" создан");
+          continue;
+        }
+
+        if (!File.Exists(correspondingTargetPath))
+        {
+          File.Copy(sourceFilePath, correspondingTargetPath);
+          synchronizationLog.Add($"Файл \"{sourceFileName}\" создан");
+          logEntries.Add(new SyncLogEntry
+          {
+            FileName = sourceFileName,
+            Action = "создан",
+            Timestamp = DateTime.Now
+          });
         }
         else
         {
-          var sourceModified = File.GetLastWriteTime(sourceFilePath);
-          var targetModified = File.GetLastWriteTime(targetFilePath);
+          DateTime targetLastModified = File.GetLastWriteTime(correspondingTargetPath);
 
-          if (sourceModified > targetModified)
+          if (sourceLastModified > targetLastModified)
           {
-            File.Copy(sourceFilePath, targetFilePath, true);
-            syncLog.Add($"Файл \"{sourceFileName}\" изменен");
+            File.Copy(sourceFilePath, correspondingTargetPath, true);
+            synchronizationLog.Add($"Файл \"{sourceFileName}\" изменен");
+            logEntries.Add(new SyncLogEntry
+            {
+              FileName = sourceFileName,
+              Action = "изменен",
+              Timestamp = DateTime.Now
+            });
           }
         }
       }
+
+      foreach (string targetFilePath in targetFilePaths)
+      {
+        string targetFileName = Path.GetFileName(targetFilePath);
+        string correspondingSourcePath = Path.Combine(sourceDirectory, targetFileName);
+
+        if (!File.Exists(correspondingSourcePath))
+        {
+          File.Delete(targetFilePath);
+          synchronizationLog.Add($"Файл \"{targetFileName}\" удален");
+          logEntries.Add(new SyncLogEntry
+          {
+            FileName = targetFileName,
+            Action = "удален",
+            Timestamp = DateTime.Now
+          });
+        }
+      }
+    }
+
+    private bool ShouldSynchronize(string fileName, DateTime currentModifiedTime, List<SyncLogEntry> previousLogEntries)
+    {
+      SyncLogEntry lastLog = previousLogEntries.FindLast(entry => entry.FileName == fileName && (entry.Action == "изменен" || entry.Action == "создан"));
+
+      return lastLog == null || currentModifiedTime > lastLog.Timestamp;
     }
   }
 }
