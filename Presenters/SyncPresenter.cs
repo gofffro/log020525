@@ -1,5 +1,5 @@
 ﻿using log020525.Models;
-using log0205025.Views;
+using log020525.Views;
 
 namespace log020525.Presenters
 {

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-using log0205025.Views;
+using log020525.Views;
 
 namespace log020525.Views
 {

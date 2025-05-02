@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace log0205025.Views
+namespace log020525.Views
 {
   public interface ISyncView
   {
