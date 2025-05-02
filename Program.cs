@@ -1,22 +1,21 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+using log020525.Presenters;
+using log020525.Views;
 
 namespace log020525
 {
-  internal static class Program
+  static class Program
   {
-    /// <summary>
-    /// Главная точка входа для приложения.
-    /// </summary>
-    [STAThread]
     static void Main()
     {
       Application.EnableVisualStyles();
       Application.SetCompatibleTextRenderingDefault(false);
-      Application.Run(new Form1());
+
+      var form = new MainForm();
+      var presenter = new SyncPresenter(form);
+
+      Application.Run(form);
     }
   }
 }
